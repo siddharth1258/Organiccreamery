@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organic Creamery 3D Traffic Dash</title>
+    <!-- Load Three.js library for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Tone.js library for programmatic audio (SFX and Music) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Inter:wght@400;700&display=swap');
+        
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            background-color: #3d8a4a; /* Organic Creamery Green background */
+            font-family: 'Inter', sans-serif;
+            color: #333;
+            overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+        }
+
+        .game-title {
+            font-family: 'Luckiest Guy', cursive;
+            color: #ffffe0;
+            font-size: clamp(1.5rem, 5vw, 2.5rem); /* Responsive font size */
+            margin-bottom: 15px;
+            text-shadow: 3px 3px 0 #d81b60;
+        }
+
+        .game-wrapper {
+            /* Wrapper ensures 16:9 ratio is maintained within screen limits */
+            width: 100%;
+            max-width: 800px;
+            position: relative;
+            aspect-ratio: 16 / 9; /* Hard 16:9 ratio for the 3D view */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            border: 8px solid #d81b60;
+            border-radius: 12px;
+        }
+        
+        .game-container {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            position: absolute;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: clamp(5px, 2vw, 10px) clamp(10px, 3vw, 20px);
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #3d8a4a; 
+            font-family: 'Luckiest Guy', cursive;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            z-index: 5;
+        }
+        
+        /* Modal Styles (Shared for Game Over, Ready, and Flavor Generator) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: clamp(20px, 5vw, 40px);
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            max-width: 90%;
+            z-index: 201; /* Ensure content is above overlay */
+        }
+        
+        .modal-content h2 {
+            font-family: 'Luckiest Guy', cursive;
+            color: #d81b60;
+            font-size: clamp(2.5rem, 8vw, 3.5rem);
+            margin-bottom: 10px;
+        }
+        
+        #readyModal .modal-content h2 {
+            color: #3d8a4a;
+        }
+
+        /* Flavor Modal Specific Styles */
+        #flavorModal h2 {
+            color: #3d8a4a;
+        }
+
+        #flavorResult h3 {
+            font-family: 'Luckiest Guy', cursive;
+            color: #d81b60;
+            margin-top: 10px;
+            font-size: 2rem;
+        }
+        #flavorResult ul {
+            list-style: disc;
+            text-align: left;
+            margin: 10px auto;
+            max-width: 250px;
+            padding-left: 20px;
+        }
+        #flavorResult li {
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+
+        .restart-button, .api-button, .control-button, #fullscreenButton {
+            background-color: #3d8a4a;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: clamp(1rem, 3vw, 1.2rem);
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            margin-top: 15px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 4px #2e6939;
+            user-select: none; /* Disable text selection on touch devices */
+        }
+
+        .restart-button:active, .api-button:active, .control-button:active, #fullscreenButton:active {
+            box-shadow: 0 2px #2e6939;
+            transform: translateY(2px);
+        }
+        
+        .api-buttons-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 15px; /* Adjusted margin */
+        }
+
+        .api-button {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        #jingleButton {
+            background-color: #d81b60; /* Raspberry Pink */
+            box-shadow: 0 4px #a81549;
+        }
+        #jingleButton:active {
+             box-shadow: 0 2px #a81549;
+        }
+        
+        #flavorButton {
+            background-color: #f7a61d; /* Orange/Gold */
+            box-shadow: 0 4px #bf7f16;
+        }
+        #flavorButton:active {
+             box-shadow: 0 2px #bf7f16;
+        }
+
+        #tipButton {
+            background-color: #1a73e8; /* Blue for Tip/Strategy */
+            box-shadow: 0 4px #1059b0;
+        }
+        #tipButton:active {
+             box-shadow: 0 2px #1059b0;
+        }
+
+        /* NEW STYLES for notification */
+        #tipNotification {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #ffffe0; /* Creamy background */
+            color: #d81b60; /* Raspberry text */
+            border: 2px solid #f7a61d;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            max-width: 800px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+        }
+        #tipNotification.show {
+            opacity: 1;
+        }
+        
+        .controls-row {
+            display: flex;
+            width: 100%;
+            max-width: 800px;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        /* Fullscreen and Pause/Controls Button Styling */
+        #fullscreenButton {
+            width: 100%;
+            max-width: 800px;
+            background-color: #2e6939; /* Darker Green */
+            margin-top: 5px;
+            padding: 8px 0;
+            font-size: 1rem;
+        }
+        
+        #pauseButton, .control-button {
+            width: 30%; /* Balanced width for three buttons */
+            margin-top: 0;
+        }
+        
+        #pauseButton {
+            background-color: #a81549; /* Darker Raspberry */
+            box-shadow: 0 4px #87113a;
+        }
+        #pauseButton:active {
+             box-shadow: 0 2px #87113a;
+        }
+    </style>
+</head>
+<body>
+
+    <h1 class="game-title">Organic Creamery 3D Traffic Dash</h1>
+    
+    <div class="game-wrapper" id="gameWrapper">
+        <div class="game-container" id="gameContainer">
+            <!-- Three.js will inject the canvas here -->
+            <div class="info-panel">
+                <span>Score: <span id="scoreDisplay">0</span></span>
+                <span>Speed: <span id="speedDisplay">0.50</span></span>
+            </div>
+            
+            <!-- Ready to Play Modal (New Start Screen) -->
+            <div class="modal-overlay" id="readyModal">
+                <div class="modal-content">
+                    <h2>Welcome to Organic Creamery Dash!</h2>
+                    <p>Use the arrow keys or screen buttons to switch lanes and deliver organic joy while dodging traffic.</p>
+                    <p>Tap "Ready to Play" to start the game and unlock the ice cream jingle!</p>
+                    <button class="restart-button" onclick="startInitialGame()">Ready to Play</button>
+                </div>
+            </div>
+
+            <div class="game-over-modal modal-overlay" id="gameOverModal">
+                <div class="modal-content">
+                    <h2>Road Rage! Game Over</h2>
+                    <p>Your delivery mission failed. Try to avoid future collisions!</p>
+                    <p>Final Score: <span id="finalScore">0</span></p>
+                    <button class="restart-button" onclick="startGame()">Restart Game</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- On-Screen Controls for Mobile/Touch -->
+    <div class="controls-row">
+        <button class="control-button" id="leftButton">
+            &#9664; LEFT
+        </button>
+        <button class="control-button" id="pauseButton" onclick="togglePause()">
+            || Pause
+        </button>
+        <button class="control-button" id="rightButton">
+            RIGHT &#9654;
+        </button>
+    </div>
+
+    <!-- Fullscreen button for mobile immersion -->
+    <button id="fullscreenButton" onclick="toggleFullScreen()">
+        &#x26F6; Toggle Full Screen Mode
+    </button>
+
+    <!-- Gemini API Buttons -->
+    <div class="api-buttons-container">
+        <button class="api-button" id="jingleButton" onclick="generateJingle()">
+            ✨ Generate Jingle & Play (TTS)
+        </button>
+        <button class="api-button" id="flavorButton" onclick="generateFlavor()">
+            ✨ Generate New Flavor
+        </button>
+        <button class="api-button" id="tipButton" onclick="generateDrivingTip()">
+            ✨ Get Driving Tip
+        </button>
+    </div>
+    
+    <!-- Tip Notification Area -->
+    <div id="tipNotification"></div> 
+
+    <div class="instructions">
+        Hint: Pause the game to get a tip or generate a flavor!
+    </div>
+
+    <!-- Flavor Result Modal (Initially hidden) -->
+    <div class="modal-overlay" id="flavorModal" onclick="this.style.display='none'">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2>New Organic Flavor Idea!</h2>
+            <div id="flavorResult">
+                <!-- Flavor content will be injected here -->
+            </div>
+            <button class="restart-button" onclick="document.getElementById('flavorModal').style.display='none'">Close</button>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Gemini API Configuration ---
+        const apiKey = ""; // API key is provided by the canvas environment
+        const FLASH_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent`;
+        const TTS_MODEL_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent`;
+        const TTS_VOICE = "Puck"; // Upbeat voice for a jingle
+        const SAMPLE_RATE = 24000; // Expected sample rate for the voice
+
+        // Structured output schema for the flavor generator
+        const FLAVOR_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                "flavorName": { 
+                    "type": "STRING", 
+                    "description": "A creative, artisanal, and organic-sounding ice cream name." 
+                },
+                "mainIngredients": { 
+                    "type": "ARRAY", 
+                    "items": { "type": "STRING" },
+                    "description": "3-4 main organic ingredients used."
+                },
+                "description": {
+                    "type": "STRING",
+                    "description": "A short, appetizing marketing description (max 15 words)."
+                }
+            }
+        };
+
+        // --- Tone.js Audio Setup ---
+        let audioInitialized = false;
+        let jingleSynth, crashNoise, slideSynth, jingleSequence;
+
+        function initAudio() {
+            if (audioInitialized || !Tone.context) {
+                 // Check if context exists but is suspended (common on mobile)
+                 if (Tone.context && Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                if (audioInitialized) return;
+            }
+            
+            // Start the Tone.js context (required for most browsers)
+            Tone.start();
+
+            // 1. Ice Cream Jingle (Music)
+            jingleSynth = new Tone.Synth({
+                oscillator: { type: "square" },
+                envelope: {
+                    attack: 0.02,
+                    decay: 0.1,
+                    sustain: 0.2,
+                    release: 0.5
+                }
+            }).toDestination();
+
+            const jingleNotes = ["C5", "G4", "E4", "C4"]; // Simple, classic jingle
+            jingleSequence = new Tone.Sequence((time, note) => {
+                jingleSynth.triggerAttackRelease(note, "8n", time);
+            }, jingleNotes, "0.5").start(0); 
+            jingleSequence.loop = true;
+            jingleSequence.playbackRate = 1.0; 
+
+            // 2. Crash SFX
+            crashNoise = new Tone.NoiseSynth({
+                noise: { type: "brown" }, // Low frequency noise
+                envelope: {
+                    attack: 0.001,
+                    decay: 0.5,
+                    sustain: 0,
+                    release: 0.05,
+                    amplitude: 0.8
+                }
+            }).toDestination();
+            
+            // 3. Lane Change SFX
+            slideSynth = new Tone.Synth({
+                oscillator: { type: "sine" },
+                envelope: {
+                    attack: 0.01,
+                    decay: 0.1,
+                    sustain: 0,
+                    release: 0.1
+                }
+            }).toDestination();
+
+            audioInitialized = true;
+        }
+        
+        function startJingle() {
+            if (audioInitialized) {
+                // Ensure the tempo matches the game speed roughly
+                Tone.Transport.bpm.value = 120 * gameSpeed / 0.5;
+                Tone.Transport.start();
+            }
+        }
+
+        function stopJingle() {
+            if (audioInitialized) {
+                Tone.Transport.stop();
+            }
+        }
+
+        function playLaneChangeSfx() {
+            if (audioInitialized) {
+                slideSynth.triggerAttackRelease("C6", "16n");
+            }
+        }
+        
+        function playCrashSfx() {
+            if (audioInitialized) {
+                crashNoise.triggerAttackRelease(1.0); // Play loud noise
+            }
+        }
+
+        // --- Game Setup ---
+        const LANE_WIDTH = 5; 
+        const NUM_LANES = 3;
+        const ROAD_DEPTH = 1000; 
+
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const speedDisplay = document.getElementById('speedDisplay');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const readyModal = document.getElementById('readyModal'); // NEW
+        const pauseButton = document.getElementById('pauseButton'); // NEW
+        const finalScore = document.getElementById('finalScore');
+        const gameContainer = document.getElementById('gameContainer');
+        const gameWrapper = document.getElementById('gameWrapper');
+        const jingleButton = document.getElementById('jingleButton');
+        const flavorButton = document.getElementById('flavorButton'); 
+        const tipButton = document.getElementById('tipButton'); 
+        const tipNotification = document.getElementById('tipNotification'); 
+        const flavorModal = document.getElementById('flavorModal');
+        const flavorResult = document.getElementById('flavorResult');
+        const leftButton = document.getElementById('leftButton');
+        const rightButton = document.getElementById('rightButton');
+
+        // Three.js core components
+        let scene, camera, renderer;
+        let vanMesh, vanHitBox;
+        let traffic = [];
+        let animationFrameId; 
+        
+        // Game State
+        let gameSpeed = 0.5; 
+        let score = 0;
+        let isGameOver = false;
+        let isPaused = true; // NEW: Game starts paused
+        let vanLaneIndex = 1; 
+        let lastTrafficSpawnTime = 0;
+        let trafficSpawnInterval = 1000;
+
+        // Road Scrolling Variables
+        let roadLines = []; 
+        const ROAD_LINE_COUNT = 30; 
+        const LINE_SPACING = 4; 
+
+        // Lane positions (X-coordinates in 3D space)
+        const LANE_POSITIONS = [-LANE_WIDTH, 0, LANE_WIDTH];
+        
+        // --- Full Screen Logic ---
+
+        /** Toggles the game container into and out of full screen mode. */
+        window.toggleFullScreen = function() {
+            try {
+                if (!document.fullscreenElement) {
+                    if (gameWrapper.requestFullscreen) {
+                        gameWrapper.requestFullscreen();
+                    } else if (gameWrapper.mozRequestFullScreen) { /* Firefox */
+                        gameWrapper.mozRequestFullScreen();
+                    } else if (gameWrapper.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+                        gameWrapper.webkitRequestFullscreen();
+                    } else if (gameWrapper.msRequestFullscreen) { /* IE/Edge */
+                        gameWrapper.msRequestFullscreen();
+                    }
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.mozCancelFullScreen) { /* Firefox */
+                        document.mozCancelFullScreen();
+                    } else if (document.webkitExitFullscreen) { /* Chrome, Safari and Opera */
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) { /* IE/Edge */
+                        document.msExitFullscreen();
+                    }
+                }
+            } catch (e) {
+                console.error("Fullscreen Request Failed:", e);
+                // Display a user-facing message explaining the failure due to permissions
+                tipNotification.textContent = '❌ Full Screen blocked by browser permissions.';
+                tipNotification.classList.add('show');
+                setTimeout(() => {
+                    tipNotification.classList.remove('show');
+                }, 5000);
+            }
+        }
+        
+        // --- Pause/Resume Logic (NEW) ---
+        window.togglePause = function() {
+            if (isGameOver) return;
+
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseButton.textContent = "▶️ Resume";
+                stopJingle();
+                cancelAnimationFrame(animationFrameId);
+            } else {
+                pauseButton.textContent = "|| Pause";
+                startJingle();
+                animate(performance.now()); // Restart the animation loop
+            }
+        }
+
+
+        // --- Utility Functions for TTS (WAV Conversion) ---
+
+        /** Helper function to write a string into a DataView for the WAV header */
+        function writeString(view, offset, str) {
+            for (let i = 0; i < str.length; i++) {
+                view.setUint8(offset + i, str.charCodeAt(i));
+            }
+        }
+        
+        /** Converts base64 string to ArrayBuffer. */
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        /** Converts PCM data buffer (Int16Array) into a playable WAV Blob. */
+        function pcmToWav(pcm16, sampleRate) {
+            // 44 bytes for header + data length
+            const buffer = new ArrayBuffer(44 + pcm16.length * 2); 
+            const view = new DataView(buffer);
+            
+            // RIFF identifier 'RIFF'
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcm16.length * 2, true); 
+            writeString(view, 8, 'WAVE');
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true);
+            view.setUint16(22, 1, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * 2, true);
+            view.setUint16(32, 2, true);
+            view.setUint16(34, 16, true);
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcm16.length * 2, true);
+
+            let offset = 44;
+            for (let i = 0; i < pcm16.length; i++) {
+                view.setInt16(offset, pcm16[i], true);
+                offset += 2;
+            }
+            
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+
+        // --- Gemini API Feature 1: Ice Cream Jingle Generator (TTS) ---
+        window.generateJingle = async function() {
+            // Ensure audio context is active when using a button
+            if (!audioInitialized) { initAudio(); }
+            
+            jingleButton.disabled = true;
+            jingleButton.textContent = '🎶 Generating Jingle...';
+            
+            let finalApiUrl = TTS_MODEL_URL;
+            if (apiKey && apiKey !== "") {
+                finalApiUrl += `?key=${apiKey}`;
+            }
+
+            const prompt = "Generate a short, cheerful, and catchy ice cream jingle (max 2 sentences) for an 'Organic Creamery' van.";
+            const systemPrompt = "You are a jingle writer for an organic, artisanal ice cream company. Write a slogan that is perfect for text-to-speech.";
+            
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: TTS_VOICE }
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            const maxRetries = 3;
+            let currentRetry = 0;
+            let audioUrl = null;
+
+            while (currentRetry < maxRetries && !audioUrl) {
+                try {
+                    const response = await fetch(finalApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const part = result?.candidates?.[0]?.content?.parts?.[0];
+                    const audioData = part?.inlineData?.data;
+                    const mimeType = part?.inlineData?.mimeType;
+
+                    if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                        const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmDataBuffer);
+                        const wavBlob = pcmToWav(pcm16, SAMPLE_RATE);
+                        audioUrl = URL.createObjectURL(wavBlob);
+                        
+                        // Stop game music temporarily to play TTS
+                        stopJingle();
+                        const audio = new Audio(audioUrl);
+                        audio.play();
+
+                        audio.onended = () => {
+                            URL.revokeObjectURL(audioUrl); 
+                            jingleButton.disabled = false;
+                            jingleButton.textContent = '✨ Generate Jingle & Play (TTS)';
+                            if (!isGameOver && !isPaused) startJingle(); // Restart game music if not over/paused
+                        };
+                    } else {
+                        throw new Error("Invalid audio data received from API.");
+                    }
+                } catch (error) {
+                    console.error("Gemini TTS API error:", error);
+                    currentRetry++;
+                    if (currentRetry < maxRetries) {
+                        const delay = Math.pow(2, currentRetry) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            if (!audioUrl) {
+                jingleButton.textContent = '❌ Generation Failed. Try Again.';
+                jingleButton.disabled = false;
+            }
+        }
+
+        // --- Gemini API Feature 2: Artisanal Flavor Generator (Structured JSON) ---
+        window.generateFlavor = async function() {
+            // Ensure audio context is active when using a button
+            if (!audioInitialized) { initAudio(); }
+            
+            // Auto-pause the game when viewing modal
+            if (!isPaused && !isGameOver) { togglePause(); }
+
+            flavorButton.disabled = true;
+            flavorButton.textContent = '🍦 Generating Flavor...';
+            flavorResult.innerHTML = '';
+            flavorModal.style.display = 'flex'; // Show modal for loading state
+
+            let finalApiUrl = FLASH_MODEL_URL;
+            if (apiKey && apiKey !== "") {
+                finalApiUrl += `?key=${apiKey}`;
+            }
+
+            const userQuery = "Generate one unique, artisanal, organic ice cream flavor idea using the required JSON schema.";
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: FLAVOR_SCHEMA
+                },
+                model: "gemini-2.5-flash-preview-05-20"
+            };
+
+            const maxRetries = 3;
+            let currentRetry = 0;
+            let flavorData = null;
+
+            while (currentRetry < maxRetries && !flavorData) {
+                try {
+                    const response = await fetch(finalApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    
+                    if (jsonText) {
+                        flavorData = JSON.parse(jsonText);
+                        showFlavorResult(flavorData);
+                    } else {
+                        throw new Error("Invalid JSON structure received from API.");
+                    }
+                } catch (error) {
+                    console.error("Gemini Flavor API error:", error);
+                    currentRetry++;
+                    if (currentRetry < maxRetries) {
+                        const delay = Math.pow(2, currentRetry) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            if (!flavorData) {
+                flavorResult.innerHTML = '<p style="color:red;">❌ Could not generate flavor idea. Please try again.</p>';
+            }
+
+            flavorButton.textContent = '✨ Generate New Flavor';
+            flavorButton.disabled = false;
+        }
+
+        function showFlavorResult(data) {
+            let ingredientsList = data.mainIngredients.map(ing => `<li>${ing}</li>`).join('');
+
+            flavorResult.innerHTML = `
+                <h3>${data.flavorName}</h3>
+                <p>— ${data.description} —</p>
+                <h4>Organic Ingredients:</h4>
+                <ul>
+                    ${ingredientsList}
+                </ul>
+            `;
+        }
+        
+        // --- Gemini API Feature 3: Driving Tip Generator (Text) ---
+        window.generateDrivingTip = async function() {
+            // Ensure audio context is active when using a button
+            if (!audioInitialized) { initAudio(); }
+            
+            // Auto-pause the game when generating tip if not already paused
+            if (!isPaused && !isGameOver) { togglePause(); }
+            
+            tipButton.disabled = true;
+            tipButton.textContent = '🧠 Analyzing Traffic...';
+            tipNotification.textContent = '';
+            tipNotification.classList.remove('show');
+            
+            let finalApiUrl = FLASH_MODEL_URL;
+            if (apiKey && apiKey !== "") {
+                finalApiUrl += `?key=${apiKey}`;
+            }
+
+            const userQuery = "Provide one concise, actionable, and motivational driving tip (max 10 words) for an endless 3D car avoidance game.";
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: "You are a professional racing coach. Keep the advice extremely short and focused on anticipation and rhythm." }] },
+                model: "gemini-2.5-flash-preview-05-20"
+            };
+
+            const maxRetries = 3;
+            let currentRetry = 0;
+            let tipText = null;
+
+            while (currentRetry < maxRetries && !tipText) {
+                try {
+                    const response = await fetch(finalApiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    tipText = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                    
+                } catch (error) {
+                    console.error("Gemini Tip API error:", error);
+                    currentRetry++;
+                    if (currentRetry < maxRetries) {
+                        const delay = Math.pow(2, currentRetry) * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            if (tipText) {
+                tipNotification.textContent = `Tip: ${tipText}`;
+                tipNotification.classList.add('show');
+                // Hide the tip after 5 seconds
+                setTimeout(() => {
+                    tipNotification.classList.remove('show');
+                }, 5000);
+            } else {
+                tipNotification.textContent = '❌ Failed to generate tip. Try again.';
+                tipNotification.classList.add('show');
+            }
+
+            tipButton.textContent = '✨ Get Driving Tip';
+            tipButton.disabled = false;
+        }
+
+        // --- Three.js Functions ---
+        
+        /** Creates a texture canvas for the 'Organic Creamery' logo */
+        function createLogoTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 128;
+            const context = canvas.getContext('2d');
+            
+            context.fillStyle = '#ffffe0'; // Cream body background
+            context.fillRect(0, 0, 128, 128);
+            
+            context.fillStyle = '#3d8a4a'; // Organic Green text
+            context.font = 'bold 30px "Luckiest Guy"';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText('ORGANIC', 64, 45);
+            context.fillText('CREAMERY', 64, 85);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.needsUpdate = true;
+            return texture;
+        }
+        
+        /** Initializes the Three.js scene, camera, and renderer. */
+        function initThree() {
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0.5, 0.8, 1.0); // Simple sky color
+
+            // 2. Camera (Perspective)
+            const width = gameContainer.clientWidth;
+            const height = gameContainer.clientHeight;
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            camera.position.set(0, 4, 6); 
+            camera.lookAt(0, 0, 0); 
+
+            // 3. Renderer
+            const existingCanvas = document.getElementById('gameCanvas');
+            if(existingCanvas) {
+                gameContainer.removeChild(existingCanvas);
+            }
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(width, height);
+            renderer.domElement.id = 'gameCanvas';
+            gameContainer.appendChild(renderer.domElement);
+
+            // 4. Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 5);
+            scene.add(directionalLight);
+        }
+
+        /** Handles window resizing to keep the 3D canvas responsive */
+        function handleResize() {
+            const width = gameContainer.clientWidth;
+            const height = gameContainer.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        /** Creates the main van (player) mesh. */
+        function createVan() {
+            const vanW = 1.5;
+            const vanH = 2.0;
+            const vanD = 3.0;
+
+            const logoTexture = createLogoTexture();
+
+            const materials = [
+                new THREE.MeshLambertMaterial({ color: 0xffffe0, map: logoTexture }), // Right side
+                new THREE.MeshLambertMaterial({ color: 0xffffe0, map: logoTexture }), // Left side
+                new THREE.MeshLambertMaterial({ color: 0xffffe0 }), // Top
+                new THREE.MeshLambertMaterial({ color: 0xffffe0 }), // Bottom
+                new THREE.MeshLambertMaterial({ color: 0xffffe0 }), // Front
+                new THREE.MeshLambertMaterial({ color: 0xffffe0 }), // Back
+            ];
+
+            const bodyGeometry = new THREE.BoxGeometry(vanW, vanH, vanD);
+            vanMesh = new THREE.Mesh(bodyGeometry, materials);
+
+            // Roof/Sign (Organic Green)
+            const roofGeometry = new THREE.BoxGeometry(vanW + 0.1, 0.4, 3.0);
+            const roofMesh = new THREE.Mesh(roofGeometry, new THREE.MeshLambertMaterial({ color: 0x3d8a4a }));
+            roofMesh.position.set(0, vanH / 2, 0);
+            vanMesh.add(roofMesh);
+
+            // Wheels (Simple cylinders)
+            const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.5, 8);
+            const wheelMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+            const wheelPositions = [
+                { x: vanW / 2 + 0.1, z: vanD / 2 - 0.5 },
+                { x: -(vanW / 2 + 0.1), z: vanD / 2 - 0.5 },
+                { x: vanW / 2 + 0.1, z: -(vanD / 2 - 0.5) },
+                { x: -(vanW / 2 + 0.1), z: -(vanD / 2 - 0.5) }
+            ];
+            
+            wheelPositions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(pos.x, -0.8, pos.z);
+                vanMesh.add(wheel);
+            });
+
+            vanMesh.position.set(LANE_POSITIONS[vanLaneIndex], vanH / 2 - 1.0, 0); 
+            scene.add(vanMesh);
+            
+            const vanW_hit = 1.5, vanH_hit = 2.0, vanD_hit = 3.0;
+            vanHitBox = new THREE.Box3().setFromCenterAndSize(vanMesh.position, new THREE.Vector3(vanW_hit, vanH_hit, vanD_hit));
+        }
+
+        /** Creates the city road and scrolling lane lines. */
+        function createRoad() {
+            // Road Mesh
+            const roadGeo = new THREE.BoxGeometry(NUM_LANES * LANE_WIDTH + 1, 0.1, ROAD_DEPTH * 2);
+            const roadMat = new THREE.MeshLambertMaterial({ color: 0x4a4a4a });
+            const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+            roadMesh.position.y = -1.5;
+            roadMesh.position.z = -ROAD_DEPTH / 2;
+            scene.add(roadMesh);
+
+            // Lane markers
+            const lineGeo = new THREE.BoxGeometry(0.1, 0.05, 1);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            
+            for (let i = 1; i < NUM_LANES; i++) {
+                const lineX = LANE_POSITIONS[i] - (LANE_WIDTH / 2);
+                for (let j = 0; j < ROAD_LINE_COUNT; j++) {
+                    const line = new THREE.Mesh(lineGeo, lineMat);
+                    line.position.set(lineX, -1.45, -j * LINE_SPACING); 
+                    scene.add(line);
+                    roadLines.push(line);
+                }
+            }
+
+            // Simple City Buildings (side environment)
+            const cityMaterial = new THREE.MeshLambertMaterial({ color: 0x666666 });
+            for (let i = 0; i < 20; i++) {
+                const height = Math.random() * 8 + 4;
+                const depth = Math.random() * 5 + 3;
+                const width = Math.random() * 3 + 2;
+
+                const buildingGeo = new THREE.BoxGeometry(width, height, depth);
+                const building = new THREE.Mesh(buildingGeo, cityMaterial);
+                
+                // Left side
+                building.position.set(-(NUM_LANES * LANE_WIDTH / 2) - 5 - width / 2, height / 2 - 1.5, Math.random() * ROAD_DEPTH * 2 - ROAD_DEPTH);
+                scene.add(building.clone());
+                
+                // Right side
+                building.position.set((NUM_LANES * LANE_WIDTH / 2) + 5 + width / 2, height / 2 - 1.5, Math.random() * ROAD_DEPTH * 2 - ROAD_DEPTH);
+                scene.add(building);
+            }
+        }
+
+        /** Creates a simple traffic car mesh. */
+        function createTrafficCar() {
+            const carW = 1.3;
+            const carH = 1.0;
+            const carD = 2.5;
+
+            // Randomize color
+            const color = new THREE.Color(`hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`);
+            const material = new THREE.MeshLambertMaterial({ color: color });
+            const geometry = new THREE.BoxGeometry(carW, carH, carD);
+            const car = new THREE.Mesh(geometry, material);
+
+            // Realistic independent speed
+            car.userData.speed = gameSpeed + (Math.random() * 0.5) - 0.2; // Base speed plus/minus variation
+            car.userData.hitBox = new THREE.Box3();
+            car.userData.dimensions = { w: carW, h: carH, d: carD };
+            
+            return car;
+        }
+
+        /** Spawns traffic cars periodically, checking for proximity to the last spawned car in that lane. */
+        function spawnTraffic(timestamp) {
+            if (timestamp - lastTrafficSpawnTime > trafficSpawnInterval) {
+                const lane = Math.floor(Math.random() * NUM_LANES);
+                
+                // Check if the closest car in this lane is far enough away (Realistic Spacing)
+                const closestCarInLane = traffic.find(car => 
+                    Math.abs(car.position.x - LANE_POSITIONS[lane]) < 0.1 && car.position.z < -40
+                );
+
+                if (!closestCarInLane || closestCarInLane.position.z > -50) {
+                    const newCar = createTrafficCar();
+                    
+                    // Position far behind the camera/van
+                    newCar.position.set(LANE_POSITIONS[lane], -1.0, -100); 
+                    
+                    scene.add(newCar);
+                    traffic.push(newCar);
+                    lastTrafficSpawnTime = timestamp;
+
+                    // Increase spawn frequency as score increases
+                    trafficSpawnInterval = Math.max(300, 1000 - score * 2); 
+                }
+            }
+        }
+
+        /** Moves traffic and checks for collisions. */
+        function updateGameLogic() {
+            // 1. Update van position (smooth X movement)
+            const targetX = LANE_POSITIONS[vanLaneIndex];
+            vanMesh.position.x += (targetX - vanMesh.position.x) * 0.15;
+            
+            // 2. Update van hit box
+            const vanW = 1.5, vanH = 2.0, vanD = 3.0;
+            vanHitBox.setFromCenterAndSize(vanMesh.position, new THREE.Vector3(vanW, vanH, vanD));
+
+            // 3. Scroll Lane Markers
+            const scrollSpeed = gameSpeed * 1.5; 
+
+            roadLines.forEach(line => {
+                line.position.z += scrollSpeed;
+                if (line.position.z > camera.position.z) { 
+                    line.position.z -= ROAD_LINE_COUNT * LINE_SPACING; 
+                }
+            });
+
+            const newTraffic = [];
+            let scoreIncreased = false;
+            for (let i = 0; i < traffic.length; i++) {
+                const car = traffic[i];
+                
+                // Traffic moves toward the camera (positive Z) based on its independent speed
+                car.position.z += car.userData.speed; 
+                
+                // Update car hit box
+                const { w, h, d } = car.userData.dimensions;
+                car.userData.hitBox.setFromCenterAndSize(car.position, new THREE.Vector3(w, h, d));
+                
+                // 1. Collision Check (Van is at Z=0)
+                if (vanHitBox.intersectsBox(car.userData.hitBox)) {
+                    isGameOver = true;
+                    showGameOver();
+                    return;
+                }
+
+                // 2. Off-screen check: If car passed Z=10 (beyond the camera)
+                if (car.position.z < 10) {
+                    newTraffic.push(car);
+                } else {
+                    scene.remove(car);
+                    // Score only increases here (no undo/decrease)
+                    score += 10; 
+                    scoreIncreased = true;
+                }
+            }
+            traffic = newTraffic;
+
+            // 4. Increase base speed and update jingle tempo
+            if (scoreIncreased) {
+                 gameSpeed = Math.min(2.0, gameSpeed + 0.005); 
+                 if (audioInitialized) {
+                    Tone.Transport.bpm.value = 120 * gameSpeed / 0.5;
+                }
+            }
+        }
+        
+        /** Shows the game over modal */
+        function showGameOver() {
+            isPaused = true; // Ensure logic stops
+            pauseButton.textContent = "|| Pause"; // Reset button visually
+            stopJingle();
+            playCrashSfx(); // Play crash SFX
+            
+            gameOverModal.style.display = 'flex';
+            finalScore.textContent = score;
+            cancelAnimationFrame(animationFrameId);
+        }
+
+        /** The main Three.js animation loop */
+        function animate(timestamp) {
+            if (isGameOver || isPaused) return; // CHECK PAUSED STATE
+            
+            animationFrameId = requestAnimationFrame(animate);
+
+            spawnTraffic(timestamp);
+            updateGameLogic();
+            
+            // Render the scene
+            renderer.render(scene, camera);
+            
+            // Update display
+            scoreDisplay.textContent = score;
+            speedDisplay.textContent = gameSpeed.toFixed(2);
+        }
+        
+        /** Handles lane change input */
+        function changeLane(direction) {
+            if (isGameOver || isPaused) return;
+            
+            const originalIndex = vanLaneIndex;
+
+            if (direction === 'left') {
+                vanLaneIndex = Math.max(0, vanLaneIndex - 1);
+            } else if (direction === 'right') {
+                vanLaneIndex = Math.min(NUM_LANES - 1, vanLaneIndex + 1);
+            }
+            
+            // Play SFX only if the lane actually changed
+            if (vanLaneIndex !== originalIndex) {
+                playLaneChangeSfx(); 
+            }
+        }
+
+        /** Attach keyboard and touch event listeners */
+        function setupEventListeners() {
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') { changeLane('left'); }
+                if (e.key === 'ArrowRight') { changeLane('right'); }
+                if (e.key === ' ' || e.key === 'p' || e.key === 'P') { // Pause on Space or P
+                    if (!isGameOver && !readyModal.style.display) {
+                        togglePause();
+                    }
+                }
+            });
+
+            // Touch/Click Controls
+            leftButton.addEventListener('click', () => changeLane('left'));
+            rightButton.addEventListener('click', () => changeLane('right'));
+            
+            // Use touch events for better mobile responsiveness
+            leftButton.addEventListener('touchstart', (e) => { 
+                e.preventDefault(); 
+                changeLane('left'); 
+            });
+            rightButton.addEventListener('touchstart', (e) => { 
+                e.preventDefault(); 
+                changeLane('right'); 
+            });
+
+            window.addEventListener('resize', handleResize);
+            document.addEventListener('fullscreenchange', handleResize);
+            document.addEventListener('webkitfullscreenchange', handleResize);
+            document.addEventListener('mozfullscreenchange', handleResize);
+            document.addEventListener('msfullscreenchange', handleResize);
+        }
+        
+        /** Core logic to reset state and setup the 3D scene */
+        function resetAndSetupGame() {
+             // Cancel any existing animation frame before cleanup
+            if (animationFrameId) { cancelAnimationFrame(animationFrameId); }
+
+            // Clean up old scene if restarting
+            if (scene) {
+                while(scene.children.length > 0){ scene.remove(scene.children[0]); }
+            }
+            traffic = [];
+            roadLines = []; 
+            
+            // Reset state
+            isGameOver = false;
+            score = 0;
+            gameSpeed = 0.5;
+            vanLaneIndex = 1;
+            lastTrafficSpawnTime = 0;
+            trafficSpawnInterval = 1000;
+
+            // Re-initialize 3D components
+            initThree();
+            createRoad();
+            createVan();
+            
+            gameOverModal.style.display = 'none';
+
+            isPaused = false; // Start game unpaused
+            pauseButton.textContent = "|| Pause";
+            
+            // Start the main game loop and jingle
+            animate(performance.now());
+            startJingle();
+        }
+
+        /** Starts the game for the first time (called by Ready button) */
+        window.startInitialGame = function() {
+            // Must call initAudio here for browser policies
+            initAudio();
+            readyModal.style.display = 'none';
+            resetAndSetupGame();
+        }
+
+
+        /** Resets and starts the game (called by Restart button) */
+        window.startGame = resetAndSetupGame;
+        
+        /** Show initial ready screen on load */
+        window.onload = () => {
+            // Setup listeners once
+            setupEventListeners(); 
+            // Show the Ready screen, waiting for user click
+            readyModal.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
